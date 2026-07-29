@@ -7,6 +7,10 @@ let currentMode = "basic";
 let matrixTarget = null;
 let matrixA = null;
 let matrixB = null;
+let integralTarget = null;
+let integralFunction = "";
+let integralFrom = "";
+let integralTo = "";
 
 function connectCalculatorButtons() {
     const buttons = document.querySelectorAll(".buttons button");
@@ -88,6 +92,11 @@ function setMode(mode) {
 
     if (mode === "matrix") {
         openMatrixMode();
+        return;
+    }
+
+    if (mode === "integral") {
+        openIntegralMode();
         return;
     }
 
@@ -260,10 +269,168 @@ function matrixClear() {
     display.value = "Matrix mode";
 }
 
+function openIntegralMode() {
+    expression = "";
+    currentMode = "integral";
+    integralTarget = null;
+    integralFunction = "";
+    integralFrom = "";
+    integralTo = "";
+    display.disabled = false;
+    display.readOnly = true;
+    display.placeholder = "Example: x²+2*x";
+    display.value = "Integral mode";
+
+    buttonsContainer.innerHTML = `
+        <button class="integral-btn" onclick="startIntegralInput('function')">f(x)</button>
+        <button class="integral-btn" onclick="startIntegralInput('from')">a</button>
+        <button class="integral-btn" onclick="startIntegralInput('to')">b</button>
+        <button class="integral-btn" onclick="calculateIntegral()">∫dx</button>
+
+        <button onclick="integralType('sin(x)')">sin</button>
+        <button onclick="integralType('cos(x)')">cos</button>
+        <button onclick="integralType('tan(x)')">tan</button>
+        <button onclick="integralType('x')">x</button>
+
+        <button onclick="integralType('7')">7</button>
+        <button onclick="integralType('8')">8</button>
+        <button onclick="integralType('9')">9</button>
+        <button onclick="integralType('-')">-</button>
+
+        <button onclick="integralType('4')">4</button>
+        <button onclick="integralType('5')">5</button>
+        <button onclick="integralType('6')">6</button>
+        <button onclick="integralType('+')">+</button>
+
+        <button onclick="integralType('1')">1</button>
+        <button onclick="integralType('2')">2</button>
+        <button onclick="integralType('3')">3</button>
+        <button onclick="integralSave()">Save</button>
+
+        <button onclick="integralType('0')">0</button>
+        <button onclick="integralType('.')">.</button>
+        <button onclick="integralType('x²')">x²</button>
+        <button class="integral-btn" onclick="integralBack()">Back</button>
+    `;
+}
+
+function startIntegralInput(target) {
+    integralTarget = target;
+    display.value = "";
+
+    if (target === "function") {
+        display.placeholder = "f(x): x²+2*x";
+    } else if (target === "from") {
+        display.placeholder = "a: lower limit";
+    } else {
+        display.placeholder = "b: upper limit";
+    }
+}
+
+function integralType(value) {
+    if (!integralTarget) {
+        display.value = "Choose f(x), a or b";
+        return;
+    }
+
+    if (display.value === "Choose f(x), a or b") {
+        display.value = "";
+    }
+
+    if (
+        integralTarget === "function" &&
+        display.value.length > 0 &&
+        /[0-9x)]$/.test(display.value) &&
+        /^(x|sin|cos|tan)/.test(value)
+    ) {
+        display.value += "*";
+    }
+
+    display.value += value;
+}
+
+function integralSave() {
+    if (!integralTarget) {
+        display.value = "Choose f(x), a or b";
+        return;
+    }
+
+    if (integralTarget === "function") {
+        integralFunction = display.value;
+        display.value = "f(x) saved";
+    } else if (integralTarget === "from") {
+        integralFrom = display.value;
+        display.value = "a saved";
+    } else {
+        integralTo = display.value;
+        display.value = "b saved";
+    }
+
+    integralTarget = null;
+}
+
+function calculateIntegral() {
+    if (!integralFunction || !integralFrom || !integralTo) {
+        display.value = "Save f(x), a, b";
+        return;
+    }
+
+    const a = Number(integralFrom);
+    const b = Number(integralTo);
+
+    if (Number.isNaN(a) || Number.isNaN(b)) {
+        display.value = "Invalid limits";
+        return;
+    }
+
+    try {
+        const result = simpsonIntegral(integralFunction, a, b, 1000);
+        display.value = `∫ = ${formatNumber(result)}`;
+    } catch {
+        display.value = "Invalid f(x)";
+    }
+}
+
+function simpsonIntegral(functionText, a, b, steps) {
+    const n = steps % 2 === 0 ? steps : steps + 1;
+    const h = (b - a) / n;
+    let sum = evaluateFunction(functionText, a) + evaluateFunction(functionText, b);
+
+    for (let i = 1; i < n; i++) {
+        const x = a + i * h;
+        sum += evaluateFunction(functionText, x) * (i % 2 === 0 ? 2 : 4);
+    }
+
+    return (h / 3) * sum;
+}
+
+function evaluateFunction(functionText, x) {
+    const safeExpression = functionText
+        .replaceAll("×", "*")
+        .replaceAll("÷", "/")
+        .replaceAll("²", "**2")
+        .replaceAll("sin", "Math.sin")
+        .replaceAll("cos", "Math.cos")
+        .replaceAll("tan", "Math.tan")
+        .replaceAll("sqrt", "Math.sqrt")
+        .replaceAll("π", "Math.PI");
+
+    return Function("x", `"use strict"; return (${safeExpression});`)(x);
+}
+
+function formatNumber(number) {
+    return Number.isInteger(number) ? String(number) : Number(number.toFixed(6)).toString();
+}
+
+function integralBack() {
+    backToCalculator();
+}
+
 function backToCalculator() {
     currentMode = "basic";
     expression = "";
     matrixTarget = null;
+    integralTarget = null;
     display.disabled = true;
     display.readOnly = false;
     display.placeholder = "";
